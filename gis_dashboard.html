@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>제주 EV 충전기 관리 대시보드</title>
+    
+    <!-- Leaflet (지도 라이브러리) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <!-- Leaflet Heatmap -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-heat/0.2.0/leaflet-heat.min.js"></script>
+    
+    <!-- Chart.js (차트) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <!-- Bootstrap (UI) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- FontAwesome (아이콘) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+        
+        header p {
+            margin: 0.5rem 0 0 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .container-main {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            padding: 20px;
+            height: calc(100vh - 120px);
+        }
+        
+        #map {
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            z-index: 1;
+        }
+        
+        .sidebar {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .sidebar-content {
+            padding: 15px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .filter-group {
+            margin-bottom: 15px;
+        }
+        
+        .filter-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .filter-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .stats-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stats-card h6 {
+            font-size: 0.8rem;
+            color: #999;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        
+        .stats-card .value {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .charger-item {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            border-left: 4px solid #764ba2;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .charger-item:hover {
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            transform: translateX(4px);
+        }
+        
+        .charger-item .id {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #333;
+        }
+        
+        .charger-item .status {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-top: 5px;
+            font-weight: 600;
+        }
+        
+        .status.available {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.in-use {
+            background: #cfe2ff;
+            color: #084298;
+        }
+        
+        .status.fault {
+            background: #f8d7da;
+            color: #842029;
+        }
+        
+        .status.offline {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+        
+        .modal-dialog {
+            max-width: 600px;
+        }
+        
+        .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .leaflet-popup-content {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 0.9rem;
+        }
+        
+        .popup-charger-name {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .popup-info {
+            font-size: 0.85rem;
+            margin: 3px 0;
+            color: #555;
+        }
+        
+        .popup-power {
+            color: #764ba2;
+            font-weight: 600;
+        }
+        
+        .bottom-controls {
+            padding: 15px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .bottom-controls button {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+        
+        .btn-secondary {
+            background: #e9ecef;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #dee2e6;
+        }
+        
+        @media (max-width: 1200px) {
+            .container-main {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                max-height: 400px;
+            }
+        }
+        
+        /* 로딩 스피너 */
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 범례 */
+        .map-legend {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-size: 0.85rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .legend-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1><i class="fas fa-charging-station"></i> 제주 EV 충전기 관리 대시보드</h1>
+        <p>실시간 충전기 상태 모니터링 및 GIS 기반 분석</p>
+    </header>
+    
+    <div class="container-main">
+        <!-- 지도 -->
+        <div id="map"></div>
+        
+        <!-- 사이드바 -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-filter"></i> 필터 & 통계
+            </div>
+            
+            <div class="sidebar-content">
+                <!-- 필터 -->
+                <div class="filter-group">
+                    <label for="filterStation">충전소</label>
+                    <select id="filterStation">
+                        <option value="">모든 충전소</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="filterStatus">상태</label>
+                    <select id="filterStatus">
+                        <option value="">모든 상태</option>
+                        <option value="available">사용 가능</option>
+                        <option value="in_use">사용 중</option>
+                        <option value="fault">고장</option>
+                        <option value="offline">오프라인</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="filterType">충전기 종류</label>
+                    <select id="filterType">
+                        <option value="">모두</option>
+                        <option value="fast">급속</option>
+                        <option value="slow">완속</option>
+                        <option value="ultra_fast">초급속</option>
+                    </select>
+                </div>
+                
+                <!-- 통계 -->
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                    <h6 style="color: #667eea; font-weight: 600; margin-bottom: 10px;">
+                        <i class="fas fa-chart-bar"></i> 오늘의 통계
+                    </h6>
+                    
+                    <div class="stats-card">
+                        <h6>운영 중인 충전기</h6>
+                        <div class="value" id="stat-available">-</div>
+                    </div>
+                    
+                    <div class="stats-card">
+                        <h6>사용 중</h6>
+                        <div class="value" id="stat-in-use">-</div>
+                    </div>
+                    
+                    <div class="stats-card">
+                        <h6>오늘의 매출</h6>
+                        <div class="value" id="stat-revenue">-</div>
+                    </div>
+                    
+                    <div class="stats-card">
+                        <h6>총 충전량</h6>
+                        <div class="value" id="stat-energy">-</div>
+                    </div>
+                </div>
+                
+                <!-- 충전기 목록 -->
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                    <h6 style="color: #667eea; font-weight: 600; margin-bottom: 10px;">
+                        <i class="fas fa-list"></i> 충전기 목록
+                    </h6>
+                    <div id="chargerList"></div>
+                </div>
+            </div>
+            
+            <div class="bottom-controls">
+                <button class="btn-primary" onclick="refreshData()">
+                    <i class="fas fa-sync-alt"></i> 새로고침
+                </button>
+                <button class="btn-secondary" onclick="exportData()">
+                    <i class="fas fa-download"></i> 내보내기
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 충전기 상세 정보 모달 -->
+    <div class="modal fade" id="chargerModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="chargerModalTitle">충전기 상세 정보</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="chargerModalBody">
+                    <!-- 동적 콘텐츠 -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ==================== 글로벌 변수 ====================
+        const API_URL = 'http://localhost:8000';
+        let map;
+        let markers = {};
+        let heatmapLayer;
+        let chargerData = {};
+        let stationData = {};
+        
+        // ==================== 지도 초기화 ====================
+        function initMap() {
+            // 제주도 중심 좌표
+            const jejuCenter = [33.3886, 126.5631];
+            
+            map = L.map('map').setView(jejuCenter, 11);
+            
+            // 타일 레이어 (OpenStreetMap)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(map);
+            
+            // 범례 추가
+            addLegend();
+            
+            // 데이터 로드
+            loadChargers();
+            loadStations();
+            loadDashboardStats();
+            
+            // 5초마다 자동 새로고침
+            setInterval(() => {
+                loadDashboardStats();
+            }, 5000);
+        }
+        
+        // ==================== 범례 추가 ====================
+        function addLegend() {
+            const legend = L.control({ position: 'bottomright' });
+            
+            legend.onAdd = function(map) {
+                const div = L.DomUtil.create('div', 'map-legend');
+                div.innerHTML = `
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: #28a745;"></div>
+                        <span>사용 가능</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: #0d6efd;"></div>
+                        <span>사용 중</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: #dc3545;"></div>
+                        <span>고장</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-icon" style="background: #6c757d;"></div>
+                        <span>오프라인</span>
+                    </div>
+                `;
+                return div;
+            };
+            
+            legend.addTo(map);
+        }
+        
+        // ==================== 데이터 로드 ====================
+        function loadChargers() {
+            const params = new URLSearchParams();
+            
+            const station = document.getElementById('filterStation').value;
+            const status = document.getElementById('filterStatus').value;
+            const type = document.getElementById('filterType').value;
+            
+            if (station) params.append('station_id', station);
+            if (status) params.append('status', status);
+            if (type) params.append('charger_type', type);
+            
+            fetch(`${API_URL}/geo/chargers?${params}`)
+                .then(res => res.json())
+                .then(data => {
+                    // 기존 마커 제거
+                    Object.values(markers).forEach(marker => map.removeLayer(marker));
+                    markers = {};
+                    
+                    // 새 마커 추가
+                    data.forEach(charger => {
+                        addChargerMarker(charger);
+                        chargerData[charger.charger_id] = charger;
+                    });
+                    
+                    // 충전기 목록 업데이트
+                    updateChargerList(data);
+                })
+                .catch(err => {
+                    console.error('충전기 데이터 로드 실패:', err);
+                    showAlert('데이터 로드 실패: ' + err.message, 'danger');
+                });
+        }
+        
+        function loadStations() {
+            fetch(`${API_URL}/stations`)
+                .then(res => res.json())
+                .then(data => {
+                    stationData = {};
+                    const select = document.getElementById('filterStation');
+                    const currentValue = select.value;
+                    
+                    // 옵션 업데이트
+                    select.innerHTML = '<option value="">모든 충전소</option>';
+                    data.forEach(station => {
+                        const option = document.createElement('option');
+                        option.value = station.station_id;
+                        option.textContent = `${station.station_name} (${station.total_chargers})`;
+                        select.appendChild(option);
+                        stationData[station.station_id] = station;
+                    });
+                    
+                    select.value = currentValue;
+                })
+                .catch(err => console.error('충전소 데이터 로드 실패:', err));
+        }
+        
+        function loadDashboardStats() {
+            fetch(`${API_URL}/statistics/dashboard`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('stat-available').textContent = 
+                        data.charger_status.available + '/' + data.total_chargers;
+                    document.getElementById('stat-in-use').textContent = 
+                        data.charger_status.in_use;
+                    document.getElementById('stat-revenue').textContent = 
+                        '₩' + data.daily_stats.total_revenue.toLocaleString();
+                    document.getElementById('stat-energy').textContent = 
+                        data.daily_stats.total_energy.toFixed(2) + ' kWh';
+                })
+                .catch(err => console.error('통계 데이터 로드 실패:', err));
+        }
+        
+        // ==================== 마커 추가 ====================
+        function addChargerMarker(charger) {
+            const statusColors = {
+                'available': '#28a745',
+                'in_use': '#0d6efd',
+                'fault': '#dc3545',
+                'offline': '#6c757d'
+            };
+            
+            const color = statusColors[charger.current_status] || '#6c757d';
+            
+            const marker = L.circleMarker([charger.latitude, charger.longitude], {
+                radius: 8,
+                fillColor: color,
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+            
+            // 팝업 내용
+            const statusText = {
+                'available': '사용 가능',
+                'in_use': '사용 중',
+                'fault': '고장',
+                'offline': '오프라인'
+            };
+            
+            const popupContent = `
+                <div class="popup-charger-name">${charger.charger_id}</div>
+                <div class="popup-info"><strong>${charger.station_name}</strong></div>
+                <div class="popup-info">${charger.address}</div>
+                <div class="popup-info">
+                    <span class="popup-power">${statusText[charger.current_status]}</span>
+                </div>
+                <div class="popup-info">정격: ${charger.rated_power} kW</div>
+                <div class="popup-info">요금: ₩${charger.unit_price_kwh}/kWh</div>
+                <div style="margin-top: 10px;">
+                    <button class="btn btn-sm btn-primary" onclick="showChargerDetails('${charger.charger_id}')">
+                        상세 정보
+                    </button>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+            marker.on('click', function() {
+                this.openPopup();
+            });
+            
+            markers[charger.charger_id] = marker;
+        }
+        
+        // ==================== 충전기 목록 업데이트 ====================
+        function updateChargerList(chargers) {
+            const listDiv = document.getElementById('chargerList');
+            
+            if (chargers.length === 0) {
+                listDiv.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">충전기가 없습니다</div>';
+                return;
+            }
+            
+            listDiv.innerHTML = chargers.map(charger => {
+                const statusClass = charger.current_status;
+                const statusText = {
+                    'available': '사용 가능',
+                    'in_use': '사용 중',
+                    'fault': '고장',
+                    'offline': '오프라인'
+                };
+                
+                return `
+                    <div class="charger-item" onclick="showChargerDetails('${charger.charger_id}')">
+                        <div class="id">${charger.charger_id}</div>
+                        <div style="font-size: 0.8rem; color: #666; margin-top: 3px;">${charger.station_name}</div>
+                        <div class="status ${statusClass}">${statusText[statusClass]}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // ==================== 상세 정보 표시 ====================
+        function showChargerDetails(chargerId) {
+            const charger = chargerData[chargerId];
+            if (!charger) return;
+            
+            fetch(`${API_URL}/statistics/charger/${chargerId}/daily`)
+                .then(res => res.json())
+                .then(stats => {
+                    const station = stationData[charger.station_id];
+                    const modalBody = document.getElementById('chargerModalBody');
+                    
+                    modalBody.innerHTML = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">충전기 ID</h6>
+                                <p class="fw-bold">${charger.charger_id}</p>
+                                
+                                <h6 class="text-muted mt-3">충전소</h6>
+                                <p>${charger.station_name}</p>
+                                
+                                <h6 class="text-muted mt-3">종류</h6>
+                                <p>${charger.charger_type === 'fast' ? '급속' : charger.charger_type === 'slow' ? '완속' : '초급속'}</p>
+                                
+                                <h6 class="text-muted mt-3">정격 전력</h6>
+                                <p>${charger.rated_power} kW</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">현재 상태</h6>
+                                <p>
+                                    <span class="badge bg-${charger.current_status === 'available' ? 'success' : charger.current_status === 'in_use' ? 'info' : 'danger'}">
+                                        ${charger.current_status === 'available' ? '사용 가능' : charger.current_status === 'in_use' ? '사용 중' : '고장'}
+                                    </span>
+                                </p>
+                                
+                                <h6 class="text-muted mt-3">요금</h6>
+                                <p>₩${charger.unit_price_kwh}/kWh</p>
+                                
+                                <h6 class="text-muted mt-3">좌표</h6>
+                                <p>
+                                    <small>${charger.latitude.toFixed(4)}, ${charger.longitude.toFixed(4)}</small>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <h6 class="text-muted">오늘의 통계</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="stat">
+                                    <small>세션 수</small>
+                                    <div class="fw-bold">${stats.num_sessions}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="stat">
+                                    <small>에너지</small>
+                                    <div class="fw-bold">${stats.total_energy.toFixed(2)} kWh</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="stat mt-3">
+                                    <small>매출</small>
+                                    <div class="fw-bold">₩${stats.total_revenue.toLocaleString()}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="stat mt-3">
+                                    <small>평균 요금</small>
+                                    <div class="fw-bold">₩${stats.avg_charge.toLocaleString()}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.getElementById('chargerModalTitle').textContent = `${charger.charger_id} - 상세 정보`;
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('chargerModal'));
+                    modal.show();
+                })
+                .catch(err => {
+                    console.error('상세 정보 로드 실패:', err);
+                    showAlert('데이터 로드 실패', 'danger');
+                });
+        }
+        
+        // ==================== 필터 이벤트 ====================
+        document.getElementById('filterStation').addEventListener('change', loadChargers);
+        document.getElementById('filterStatus').addEventListener('change', loadChargers);
+        document.getElementById('filterType').addEventListener('change', loadChargers);
+        
+        // ==================== 기타 함수 ====================
+        function refreshData() {
+            loadChargers();
+            loadStations();
+            loadDashboardStats();
+            showAlert('데이터가 새로고침되었습니다', 'success');
+        }
+        
+        function exportData() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                chargers: chargerData,
+                stations: stationData
+            };
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `charger_data_${new Date().getTime()}.json`;
+            a.click();
+            
+            showAlert('데이터가 내보내져졌습니다', 'success');
+        }
+        
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.style.position = 'fixed';
+            alertDiv.style.top = '100px';
+            alertDiv.style.right = '20px';
+            alertDiv.style.zIndex = '10000';
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alertDiv);
+            
+            setTimeout(() => alertDiv.remove(), 5000);
+        }
+        
+        // ==================== 초기화 ====================
+        window.addEventListener('load', initMap);
+    </script>
+</body>
+</html>
