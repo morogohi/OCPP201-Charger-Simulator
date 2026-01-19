@@ -32,13 +32,15 @@ Git 저장소가 초기화되었고 첫 번째 커밋이 완료되었습니다.
 ### Step 3: PowerShell에서 실행
 
 다음 명령을 실행합니다 (YOUR_USERNAME, YOUR_TOKEN, YOUR_EMAIL을 교체):
+# Username : morogohi
+# E-mail : morogohi@gmail.com
 
 ```powershell
 cd "c:\Project\OCPP201(P2M)"
 
 # 사용자 정보 설정 (로컬 저장소만)
-git config user.email "YOUR_EMAIL@example.com"
-git config user.name "YOUR_NAME"
+git config user.email "morogohi@gmail.com"
+git config user.name "morooghi"
 
 # 원격 저장소 추가
 git remote add origin https://YOUR_USERNAME:YOUR_TOKEN@github.com/YOUR_USERNAME/OCPP201-Charger-Simulator.git
@@ -54,7 +56,7 @@ git push -u origin main
 
 푸시가 완료되면 다음 URL에서 확인할 수 있습니다:
 ```
-https://github.com/YOUR_USERNAME/OCPP201-Charger-Simulator
+https://github.com/morogohi/OCPP201-Charger-Simulator
 ```
 
 ## 🔐 SSH를 사용한 더 안전한 방법

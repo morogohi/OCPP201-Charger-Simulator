@@ -6,8 +6,8 @@
 
 - GitHub 계정 (없으면 https://github.com 에서 가입)
 - Git이 설치되어 있음 (이미 완료됨 ✓)
-- GitHub Personal Access Token 생성됨
-
+- GitHub Personal Access Token 생성됨 (완료됨)
+됨
 ## 🚀 Step 1: GitHub Personal Access Token 생성
 
 1. GitHub에 로그인 (https://github.com)
@@ -43,6 +43,7 @@ cd "c:\Project\OCPP201(P2M)"
 # 원격 저장소 추가
 git remote add origin https://YOUR_USERNAME:YOUR_TOKEN@github.com/YOUR_USERNAME/OCPP201-Charger-Simulator.git
 
+
 # 원격 저장소 확인
 git remote -v
 ```
@@ -63,7 +64,7 @@ GitHub 저장소에 성공적으로 업로드되었습니다!
 
 업로드 후 다음 URL로 확인할 수 있습니다:
 ```
-https://github.com/YOUR_USERNAME/OCPP201-Charger-Simulator
+https://github.com/moroghi/OCPP201-Charger-Simulator
 ```
 
 ## 🔐 보안 팁

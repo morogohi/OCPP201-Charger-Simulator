@@ -1,0 +1,131 @@
+# GitHub 업로드 안내
+
+## 🎯 현재 상태
+
+✅ **Git 저장소 초기화 완료**
+- 총 3개 커밋
+- 19개 파일 추적 중
+- 모든 소스 코드 및 문서 포함
+
+## 📋 체크리스트
+
+필요한 단계를 완료하세요:
+
+### 1단계: GitHub 저장소 생성 ☐
+```
+1. https://github.com/new 방문
+2. Repository name: OCPP201-Charger-Simulator
+3. Public 또는 Private 선택
+4. Create repository 클릭
+```
+
+### 2단계: Personal Access Token 생성 ☐
+```
+1. https://github.com/settings/tokens 방문
+2. Generate new token (classic) 클릭
+3. Scopes에서 'repo' 체크
+4. Token 복사 (매우 중요!)
+```
+
+### 3단계: PowerShell에서 푸시 ☐
+
+다음을 실행하세요 (YOUR_USERNAME, YOUR_TOKEN 교체):
+
+```powershell
+cd "c:\Project\OCPP201(P2M)"
+
+git remote add origin https://YOUR_USERNAME:YOUR_TOKEN@github.com/YOUR_USERNAME/OCPP201-Charger-Simulator.git
+
+git branch -M main
+
+git push -u origin main
+```
+
+## 📊 업로드될 파일
+
+| 카테고리 | 파일명 | 설명 |
+|---------|--------|------|
+| **Core** | ocpp_models.py | OCPP 2.0.1 데이터 모델 |
+| | ocpp_messages.py | 메시지 처리 + 디버그 |
+| | charger_simulator.py | 충전기 시뮬레이터 |
+| | ocpp_server.py | 중앙 서버 |
+| **Tools** | server_api.py | REST API |
+| | logging_config.py | 로깅 설정 |
+| | run_all.py | 통합 실행 |
+| | test_simulator.py | 테스트 |
+| **Demo** | demo.py | 기본 데모 |
+| | demo_protocol_debug.py | 프로토콜 디버그 |
+| **Docs** | README.md | 프로젝트 소개 |
+| | PROTOCOL_DEBUG_GUIDE.md | 디버그 가이드 |
+| | PROTOCOL_DEBUG_UPDATE.md | 업데이트 정보 |
+| | GITHUB_UPLOAD_GUIDE.md | GitHub 가이드 |
+| | GIT_SETUP_COMPLETE.md | Git 설정 정보 |
+| | READY_FOR_GITHUB.md | 업로드 준비 |
+| **Config** | requirements.txt | Python 의존성 |
+| | .gitignore | Git 무시 파일 |
+| | push_to_github.ps1 | 업로드 스크립트 |
+
+## 🔑 간단한 푸시 명령어
+
+```powershell
+# 모든 단계를 한 번에
+git remote add origin https://YOUR_USERNAME:YOUR_TOKEN@github.com/YOUR_USERNAME/OCPP201-Charger-Simulator.git && git branch -M main && git push -u origin main
+```
+
+## ✨ 이후 이용 방법
+
+### 커밋 및 푸시
+```powershell
+git add .
+git commit -m "feat: 설명"
+git push
+```
+
+### 클론 (다른 기기에서 다운로드)
+```powershell
+git clone https://github.com/YOUR_USERNAME/OCPP201-Charger-Simulator.git
+```
+
+### 최신 업데이트 가져오기
+```powershell
+git pull
+```
+
+## 🔒 보안 주의사항
+
+⚠️ **Token 보안:**
+- Token을 노출하지 마세요
+- 푸시 후 로컬 명령어 이력을 삭제할 수 있습니다:
+  ```powershell
+  Remove-Item (Get-PSReadlineOption).HistorySavePath
+  ```
+
+✅ **더 안전한 방법:**
+- SSH 키 사용 (권장)
+- GitHub CLI 사용
+- 자세한 내용: `GIT_SETUP_COMPLETE.md` 참고
+
+## 📞 문제 해결
+
+| 문제 | 해결방법 |
+|------|--------|
+| "fatal: unable to access" | Token 확인, 저장소명 확인 |
+| Token 노출됨 | GitHub에서 즉시 무효화 |
+| SSH 권한 문제 | SSH 키 다시 추가 |
+| 충돌 발생 | git pull 후 수동 해결 |
+
+## 📚 더 자세한 가이드
+
+- **READY_FOR_GITHUB.md** - 완전한 준비 가이드
+- **GIT_SETUP_COMPLETE.md** - Git 설정 상세 가이드
+- **GITHUB_UPLOAD_GUIDE.md** - GitHub 업로드 단계별 가이드
+
+## 🎉 완료!
+
+모든 준비가 완료되었습니다. 이제 GitHub에 푸시하기만 하면 됩니다!
+
+```
+https://github.com/YOUR_USERNAME/OCPP201-Charger-Simulator
+```
+
+행운을 빕니다! 🚀
