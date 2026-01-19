@@ -12,7 +12,12 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-from sqlalchemy.types import JSON, JSONB
+from sqlalchemy.types import JSON
+try:
+    from sqlalchemy.dialects.postgresql import JSONB
+except ImportError:
+    # SQLAlchemy 2.0+에서 JSONB가 없으면 JSON 사용
+    JSONB = JSON
 import enum
 import os
 

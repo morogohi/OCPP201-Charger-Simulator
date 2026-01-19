@@ -4,7 +4,15 @@
 
 from datetime import datetime, date, timedelta
 from decimal import Decimal
-from database.models import db_manager, ChargerTypeEnum, ChargerStatusEnum
+import os
+import sys
+
+# PostgreSQL 데이터베이스 사용
+try:
+    from database.models_postgresql import db_manager, ChargerTypeEnum, ChargerStatusEnum
+except ImportError:
+    from database.models import db_manager, ChargerTypeEnum, ChargerStatusEnum
+
 from database.services import (
     StationService, ChargerService, UsageLogService, 
     PowerConsumptionService, StatisticsService
@@ -15,9 +23,16 @@ import random
 def init_jeju_chargers():
     """제주 지역 충전기 샘플 데이터 초기화"""
     
-    # 데이터베이스 초기화
-    db_manager.initialize()
-    session = db_manager.get_session()
+    # 데이터베이스 초기화 (PostgreSQL 사용)
+    database_url = os.getenv('DATABASE_URL')
+    if database_url and 'postgresql' in database_url:
+        from database.models_postgresql import DatabaseManager as DBManager
+        db_mgr = DBManager(database_url)
+    else:
+        db_mgr = db_manager
+        
+    db_mgr.initialize()
+    session = db_mgr.get_session()
     
     # 제주 지역 충전소 데이터 (실제 제주 주요 지역 좌표 기반)
     stations_data = [
