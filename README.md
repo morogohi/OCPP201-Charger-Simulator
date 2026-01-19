@@ -8,23 +8,39 @@ OCPP 2.0.1(Open Charge Point Protocol 2.0.1) 기준으로 개발한 파이썬 �
 
 ```
 OCPP201(P2M)/
-├── ocpp_models.py              # OCPP 2.0.1 데이터 모델
-├── ocpp_messages.py            # OCPP 메시지 처리 + 프로토콜 로깅
-├── charger_simulator.py         # 충전기 시뮬레이터
-├── ocpp_server.py              # OCPP 중앙 서버
-├── server_api.py               # REST API (관리/모니터링)
-├── logging_config.py           # 로깅 설정 유틸리티 ✨
-├── demo.py                     # 완전 시스템 데모
-├── demo_protocol_debug.py       # 프로토콜 디버그 데모 ✨
-├── run_all.py                  # 서버 + 시뮬레이터 통합 실행
-├── test_simulator.py           # 시뮬레이터 테스트
-├── requirements.txt            # 의존성
-├── README.md                   # 이 파일
-├── PROTOCOL_DEBUG_GUIDE.md     # 프로토콜 디버그 상세 가이드 ✨
-└── ocpp_protocol_debug.log     # 프로토콜 디버그 로그 (자동 생성)
+├── ocpp_models.py                     # OCPP 2.0.1 데이터 모델
+├── ocpp_messages.py                   # OCPP 메시지 처리 + 프로토콜 로깅
+├── charger_simulator.py               # 충전기 시뮬레이터
+├── ocpp_server.py                     # OCPP 중앙 서버
+├── server_api.py                      # REST API (관리/모니터링)
+├── logging_config.py                  # 로깅 설정 유틸리티
+├── demo.py                            # 완전 시스템 데모
+├── demo_protocol_debug.py             # 프로토콜 디버그 데모
+├── run_all.py                         # 서버 + 시뮬레이터 통합 실행
+├── test_simulator.py                  # 시뮬레이터 테스트
+│
+├── database/                          # 📊 GIS 대시보드 데이터베이스
+│   ├── models_postgresql.py           # PostgreSQL ORM 모델 (7개 테이블)
+│   ├── services.py                    # 비즈니스 로직 (CRUD, 통계)
+│   └── __init__.py
+│
+├── gis_dashboard_api.py               # 🗺️ FastAPI REST API (20+ 엔드포인트)
+├── advanced_dashboard.html            # 🎨 고급 GIS 대시보드 (Leaflet 지도)
+├── gis_dashboard.html                 # 기본 대시보드
+│
+├── add_emart_chargers.py              # ⭐ 이마트 충전기 추가 스크립트
+├── verify_emart_installation.py       # ⭐ 이마트 설치 확인 스크립트
+│
+├── requirements.txt                   # Python 의존성
+├── README.md                          # 이 파일
+├── PROTOCOL_DEBUG_GUIDE.md            # 프로토콜 디버그 상세 가이드
+├── POSTGRESQL_SETUP.md                # PostgreSQL 설치 가이드
+├── EMART_INSTALLATION_REPORT.md       # ⭐ 이마트 충전기 설치 보고서
+├── TEST_REPORT.md                     # 시스템 테스트 결과 보고서
+└── ocpp_protocol_debug.log            # 프로토콜 디버그 로그 (자동 생성)
 ```
 
-✨ = 프로토콜 디버그 기능 추가
+⭐ = 이마트 제주 충전기 설치 (2026-01-20 추가)
 
 ## 주요 기능
 
@@ -56,6 +72,36 @@ OCPP201(P2M)/
 - 거래 시작/중지 제어 (`/chargers/{charger_id}/start`, `/stop`)
 - 헬스 체크 (`/health`)
 
+### 5. 🗺️ GIS 기반 충전기 관제 시스템 (신규 추가)
+- **고급 대시보드** (`advanced_dashboard.html`)
+  - Leaflet.js 지도 기반 실시간 모니터링
+  - 충전기 상태별 색상 마커 (초록/파랑/빨강/회색)
+  - Smart Charging 제어 (10-100kW 출력 제한)
+  - 실시간 KPI 카드 (활성 충전기, 총 에너지, 매출, 이용률)
+  - 시계열 차트 (시간별 전력 사용량)
+  - 충전기 이력 테이블
+  - 원격 시작/중지 버튼
+  - 5초 자동 새로고침
+
+- **FastAPI REST 서버** (`gis_dashboard_api.py`)
+  - 20+ 엔드포인트
+  - PostgreSQL 데이터베이스 연동
+  - CORS 지원 (모든 출처)
+  - Swagger API 문서 (`/docs`)
+
+- **PostgreSQL 데이터베이스** (`database/`)
+  - 7개 테이블 (충전소, 충전기, 사용 이력, 통계)
+  - 실시간 통계 계산
+  - 거래 데이터 관리
+
+### 6. ⭐ 이마트 제주 충전기 설치 (2026-01-20)
+- **이마트 제주점**: 100kW × 12개 (제주시 중앙로 148)
+- **이마트 신제주점**: 50kW × 10개 (제주시 신제주로 36)
+- **이마트 서귀포점**: 100kW × 12개 (서귀포시 중산간로 465)
+- **총 34개 충전기, 2,900kW 설치 용량**
+- GIS 지도에 모든 충전기 위치 표시 완료
+- 실시간 상태 모니터링 중
+
 ## 설치 및 실행
 
 ### 1. 의존성 설치
@@ -63,12 +109,29 @@ OCPP201(P2M)/
 pip install -r requirements.txt
 ```
 
-### 2. 전체 시스템 데모 실행 (권장)
+### 2. PostgreSQL 데이터베이스 설정 (GIS 대시보드용)
+```bash
+# 윈도우: PostgreSQL 18 설치 후
+set DATABASE_URL=postgresql://charger_user:admin@localhost:5432/charger_db
+python -c "from database.models_postgresql import DatabaseManager; db = DatabaseManager(); db.initialize()"
+```
+
+### 3. GIS 대시보드 실행
+```bash
+# 터미널 1: API 서버 시작
+set DATABASE_URL=postgresql://charger_user:admin@localhost:5432/charger_db
+python gis_dashboard_api.py
+
+# 터미널 2: 브라우저에서 대시보드 열기
+advanced_dashboard.html
+```
+
+### 4. OCPP 시스템 데모 실행
 ```bash
 python demo.py
 ```
 
-### 3. 프로토콜 디버그 데모 (상세 로깅 포함)
+### 5. 프로토콜 디버그 데모 (상세 로깅 포함)
 ```bash
 python demo_protocol_debug.py
 ```
@@ -77,6 +140,36 @@ python demo_protocol_debug.py
 - 모든 OCPP 메시지를 상세히 로깅
 - 자동으로 `ocpp_protocol_debug.log` 파일 생성
 - 각 단계별로 프로토콜 상세 정보 표시
+
+## GIS 대시보드 사용 가이드
+
+### 대시보드 접속
+```
+파일: c:\Project\OCPP201(P2M)\advanced_dashboard.html
+API 문서: http://localhost:5000/docs  (API 서버 실행 시)
+```
+
+### 주요 기능
+- **지도**: 제주도 중심 Leaflet 지도
+- **마커**: 충전기 위치 및 상태 표시
+  - 🟢 초록색: 사용 가능 (AVAILABLE)
+  - 🔵 파란색: 충전 중 (IN_USE)
+  - 🔴 빨간색: 고장 (FAULT)
+  - ⚫ 회색: 오프라인 (OFFLINE)
+- **Smart Charging**: 충전기 출력 제어 (10-100kW)
+- **통계**: 실시간 KPI 및 차트
+- **이력**: 최근 충전기 거래 기록
+
+### API 엔드포인트
+```
+GET  /stations              # 모든 충전소
+GET  /chargers              # 모든 충전기
+GET  /geo/chargers          # GIS 형식 (지도용)
+GET  /geo/heatmap          # 히트맵 데이터
+GET  /statistics/dashboard # 대시보드 통계
+POST /chargers/{id}/control # 충전기 제어
+GET  /docs                 # API 문서 (Swagger)
+```
 
 ## 프로토콜 디버그 로깅
 

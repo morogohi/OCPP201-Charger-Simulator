@@ -1,7 +1,18 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 GIS 기반 충전기 모니터링 대시보드 API
 FastAPI 기반 REST API 제공
 """
+
+import sys
+import os
+
+# Windows 환경에서 UTF-8 설정
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,14 +24,25 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 import logging
 import os
+import sys
 
-from database.models import (
-    db_manager, ChargerTypeEnum, ChargerStatusEnum
+# Windows 인코딩 설정
+if sys.stdout.encoding != 'utf-8':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+from database.models_postgresql import (
+    DatabaseManager, ChargerTypeEnum, ChargerStatusEnum
 )
 from database.services import (
     StationService, ChargerService, UsageLogService,
     PowerConsumptionService, StatisticsService
 )
+
+# 데이터베이스 초기화
+db_manager = DatabaseManager()
+db_manager.initialize()
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -507,13 +529,10 @@ async def get_dashboard_stats(
 if __name__ == "__main__":
     import uvicorn
     
-    # 데이터베이스 초기화
-    db_manager.initialize()
-    
     # 서버 실행
     uvicorn.run(
         app,
-        host="0.0.0.0",
-        port=3000,
+        host="127.0.0.1",
+        port=5000,
         log_level="info"
     )
