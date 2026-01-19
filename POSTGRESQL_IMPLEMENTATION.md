@@ -74,7 +74,7 @@ brew install postgresql
 ### 2단계: 데이터베이스 및 사용자 생성
 
 ```sql
-CREATE USER charger_user WITH PASSWORD 'charger_password';
+CREATE USER charger_user WITH PASSWORD 'admin';
 CREATE DATABASE charger_db OWNER charger_user;
 GRANT ALL PRIVILEGES ON DATABASE charger_db TO charger_user;
 ```
@@ -83,10 +83,10 @@ GRANT ALL PRIVILEGES ON DATABASE charger_db TO charger_user;
 
 ```powershell
 # Windows PowerShell
-$env:DATABASE_URL = "postgresql://charger_user:charger_password@localhost:5432/charger_db"
+$env:DATABASE_URL = "postgresql://charger_user:admin@localhost:5432/charger_db"
 
 # Linux/macOS
-export DATABASE_URL="postgresql://charger_user:charger_password@localhost:5432/charger_db"
+export DATABASE_URL="postgresql://charger_user:admin@localhost:5432/charger_db"
 ```
 
 ### 4단계: Python 패키지 설치

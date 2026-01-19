@@ -88,7 +88,7 @@ sudo -u postgres psql
 
 ```sql
 -- 사용자 생성
-CREATE USER charger_user WITH PASSWORD 'charger_password';
+CREATE USER charger_user WITH PASSWORD 'admin';
 
 -- 데이터베이스 생성
 CREATE DATABASE charger_db OWNER charger_user;
@@ -161,7 +161,7 @@ pip install -r requirements.txt
 
 ```powershell
 # 임시 설정 (현재 세션만)
-$env:DATABASE_URL = "postgresql://charger_user:charger_password@localhost:5432/charger_db"
+$env:DATABASE_URL = "postgresql://charger_user:admin@localhost:5432/charger_db"
 
 # 확인
 $env:DATABASE_URL
@@ -170,14 +170,14 @@ $env:DATABASE_URL
 #### Windows (CMD)
 
 ```cmd
-set DATABASE_URL=postgresql://charger_user:charger_password@localhost:5432/charger_db
+set DATABASE_URL=postgresql://charger_user:admin@localhost:5432/charger_db
 ```
 
 #### Linux/macOS
 
 ```bash
 # ~/.bashrc 또는 ~/.zshrc에 추가
-export DATABASE_URL="postgresql://charger_user:charger_password@localhost:5432/charger_db"
+export DATABASE_URL="postgresql://charger_user:admin@localhost:5432/charger_db"
 
 # 적용
 source ~/.bashrc
@@ -192,7 +192,7 @@ echo $DATABASE_URL
 postgresql://[user[:password]@][netloc][:port][/dbname][?param1=value1&...]
 
 예시:
-- postgresql://charger_user:charger_password@localhost:5432/charger_db
+- postgresql://charger_user:admin@localhost:5432/charger_db
 - postgresql+psycopg2://user:password@localhost/charger_db
 - postgresql://localhost/charger_db  (동일 호스트, 기본 인증)
 ```

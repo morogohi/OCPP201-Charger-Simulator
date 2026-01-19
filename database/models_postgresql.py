@@ -466,7 +466,7 @@ class DatabaseManager:
 # PostgreSQL 기본 데이터베이스 URL
 DEFAULT_DATABASE_URL = os.getenv(
     'DATABASE_URL',
-    'postgresql://charger_user:charger_password@localhost:5432/charger_db'
+    'postgresql://charger_user:admin@localhost:5432/charger_db'
 )
 
 # 데이터베이스 관리자 인스턴스
