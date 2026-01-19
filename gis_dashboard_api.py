@@ -5,12 +5,14 @@ FastAPI 기반 REST API 제공
 
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 import logging
+import os
 
 from database.models import (
     db_manager, ChargerTypeEnum, ChargerStatusEnum
@@ -79,8 +81,7 @@ class StationResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class ChargerCreate(BaseModel):
@@ -128,8 +129,7 @@ class ChargerResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class GeoChargerResponse(BaseModel):
@@ -145,8 +145,7 @@ class GeoChargerResponse(BaseModel):
     rated_power: float
     unit_price_kwh: Decimal
     
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 class ChargerDashboard(BaseModel):
@@ -515,6 +514,6 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=8000,
+        port=3000,
         log_level="info"
     )
