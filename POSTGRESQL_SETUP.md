@@ -29,12 +29,18 @@ https://www.postgresql.org/download/windows/
 # - 포트: 5432 (기본)
 # - 슈퍼유저: postgres
 # - 암호: 설정 필수
+# - 설치 경로: C:\Program Files\PostgreSQL\18
 ```
 
 #### 3단계: 설치 확인
 ```powershell
-psql --version
-# psql (PostgreSQL) 15.x
+# 설치 경로 추가 (선택)
+$pgBin = 'C:\Program Files\PostgreSQL\18\bin'
+$env:PATH += ";$pgBin"
+
+# 버전 확인
+&"C:\Program Files\PostgreSQL\18\bin\psql" --version
+# psql (PostgreSQL) 18.1
 ```
 
 ---
@@ -155,6 +161,25 @@ pip install -r requirements.txt
 
 ## 연결 설정
 
+### Windows PATH 설정 (선택)
+
+PostgreSQL 명령어 (`psql`, `pg_dump` 등)를 직접 사용하려면:
+
+```powershell
+# 임시 설정 (현재 세션)
+$env:PATH += ";C:\Program Files\PostgreSQL\18\bin"
+
+# 영구 설정 (시스템 환경변수)
+[Environment]::SetEnvironmentVariable(
+    "PATH",
+    "$([Environment]::GetEnvironmentVariable('PATH', 'Machine'));C:\Program Files\PostgreSQL\18\bin",
+    "Machine"
+)
+
+# 확인
+psql --version
+```
+
 ### 환경변수 설정
 
 #### Windows (PowerShell)
@@ -162,6 +187,9 @@ pip install -r requirements.txt
 ```powershell
 # 임시 설정 (현재 세션만)
 $env:DATABASE_URL = "postgresql://charger_user:admin@localhost:5432/charger_db"
+
+# 영구 설정 (시스템 환경변수)
+[Environment]::SetEnvironmentVariable("DATABASE_URL", "postgresql://charger_user:admin@localhost:5432/charger_db", "User")
 
 # 확인
 $env:DATABASE_URL
