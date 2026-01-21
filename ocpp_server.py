@@ -69,6 +69,7 @@ class OCPPServer:
         self.host = host
         self.port = port
         self.chargers: Dict[str, ChargerConnection] = {}
+        self.shutdown_event = asyncio.Event()  # 종료 이벤트
         self.pending_requests: Dict[str, dict] = {}
 
     async def start(self):
@@ -77,26 +78,37 @@ class OCPPServer:
             self.handle_charger_connection,
             self.host,
             self.port,
-            subprotocols=["ocpp2.0.1"]
+            subprotocols=["ocpp2.0.1"],
+            ping_interval=20,
+            ping_timeout=20
         ):
             logger.info(f"OCPP 2.0.1 서버 시작: ws://{self.host}:{self.port}")
-            await asyncio.Future()  # 무한 실행
+            # 종료 이벤트를 기다림 (기본적으로 무한 대기)
+            await self.shutdown_event.wait()
+
 
     async def handle_charger_connection(self, websocket):
         """충전기 연결 처리"""
         # 경로에서 충전기 ID 추출 (요청 헤더에서)
         path = "/"
+        charger_id = None
+        charger = None
+        
         try:
             # websocket.request는 websockets 라이브러리에서 제공
             path = websocket.request.path if hasattr(websocket, 'request') else "/"
-        except:
+        except Exception as e:
+            logger.error(f"경로 추출 오류: {e}")
             path = "/"
         
         charger_id = path.lstrip('/')
         
         if not charger_id or charger_id == "":
             logger.warning("충전기 ID 없음")
-            await websocket.close()
+            try:
+                await websocket.close()
+            except:
+                pass
             return
 
         logger.info(f"충전기 연결: {charger_id}")
@@ -108,30 +120,42 @@ class OCPPServer:
         try:
             # 메시지 수신 및 처리 루프
             while charger.connected:
-                message = await charger.receive()
+                try:
+                    message = await charger.receive()
+                    
+                    if not message:
+                        break
+
+                    try:
+                        message_type, message_id, action, payload = OCPPMessage.parse_message(message)
+                        logger.debug(f"메시지 파싱 성공: {action}")
+                        
+                        if message_type == OCPPMessage.CALL:
+                            # 요청 처리
+                            await self.handle_request(charger, message_id, action, payload)
+                        
+                        elif message_type == OCPPMessage.CALLRESULT:
+                            # 응답 처리
+                            await self.handle_response(charger_id, message_id, payload)
+                        
+                        elif message_type == OCPPMessage.CALLERROR:
+                            logger.error(f"오류 응답 ({charger_id}): {action}")
+                    
+                    except Exception as e:
+                        logger.error(f"메시지 처리 오류 ({charger_id}): {type(e).__name__}: {e}", exc_info=True)
                 
-                if not message:
+                except asyncio.CancelledError:
+                    logger.info(f"연결 취소됨: {charger_id}")
+                    break
+                except asyncio.TimeoutError:
+                    logger.warning(f"메시지 수신 타임아웃: {charger_id}")
+                    continue
+                except Exception as e:
+                    logger.error(f"메시지 수신 오류 ({charger_id}): {type(e).__name__}: {e}")
                     break
 
-                try:
-                    message_type, message_id, action, payload = OCPPMessage.parse_message(message)
-                    
-                    if message_type == OCPPMessage.CALL:
-                        # 요청 처리
-                        await self.handle_request(charger, message_id, action, payload)
-                    
-                    elif message_type == OCPPMessage.CALLRESULT:
-                        # 응답 처리
-                        await self.handle_response(charger_id, message_id, payload)
-                    
-                    elif message_type == OCPPMessage.CALLERROR:
-                        logger.error(f"오류 응답 ({charger_id}): {action}")
-                
-                except Exception as e:
-                    logger.error(f"메시지 처리 오류 ({charger_id}): {e}")
-
         except Exception as e:
-            logger.error(f"연결 처리 오류 ({charger_id}): {e}")
+            logger.error(f"연결 처리 오류 ({charger_id}): {type(e).__name__}: {e}", exc_info=True)
         
         finally:
             # 연결 종료
@@ -215,17 +239,52 @@ class OCPPServer:
 
     async def handle_transaction_event(self, charger: ChargerConnection, message_id: str, payload: Dict[str, Any]):
         """거래 이벤트 처리"""
-        event_type = payload.get("eventType")
-        transaction_info = payload.get("transactionInfo", {})
-        transaction_id = transaction_info.get("transactionId")
-        meter_value = payload.get("meterValue", [{}])[0].get("sampledValue", [{}])[0].get("value", 0)
-        
-        logger.info(f"거래 이벤트 ({charger.charger_id}): {event_type}, ID: {transaction_id}, 에너지: {meter_value} kWh")
-        
-        response = {}
-        
-        message = OCPPMessage.create_call_result(message_id, response)
-        await charger.send(message)
+        try:
+            event_type = payload.get("eventType")
+            transaction_data = payload.get("transactionData", {})
+            transaction_id = transaction_data.get("transactionId")
+            total_cost = transaction_data.get("totalCost", 0)
+            
+            # chargingPeriods에서 에너지 데이터 추출
+            energy_delivered = 0.0
+            charging_periods = transaction_data.get("chargingPeriods", [])
+            
+            if charging_periods:
+                for period in charging_periods:
+                    dimensions = period.get("dimensions", [])
+                    for dimension in dimensions:
+                        if dimension.get("name") == "Energy.Active.Import.Register":
+                            # value는 Wh단위이므로 kWh로 변환 (unitMultiplier가 1이면 그대로 사용)
+                            energy_wh = dimension.get("value", 0)
+                            energy_delivered = energy_wh / 1000.0  # Wh to kWh
+                            break
+            
+            logger.info(f"거래 이벤트 ({charger.charger_id}): {event_type}, ID: {transaction_id}, "
+                       f"에너지: {energy_delivered:.2f} kWh, 비용: {total_cost}")
+            
+            # 거래 정보 저장 (Ended 이벤트일 때만)
+            if event_type == "Ended" and transaction_id:
+                try:
+                    charger.transactions[transaction_id] = {
+                        "transaction_id": transaction_id,
+                        "charger_id": charger.charger_id,
+                        "energy_delivered": energy_delivered,
+                        "total_cost": total_cost,
+                        "timestamp": datetime.now()
+                    }
+                    logger.info(f"거래 저장 완료: {transaction_id}, 에너지: {energy_delivered:.2f} kWh")
+                except Exception as e:
+                    logger.error(f"거래 저장 실패: {e}")
+            
+            response = {}
+            message = OCPPMessage.create_call_result(message_id, response)
+            await charger.send(message)
+            
+        except Exception as e:
+            logger.error(f"거래 이벤트 처리 오류 ({charger.charger_id}): {e}")
+            response = {}
+            message = OCPPMessage.create_call_result(message_id, response)
+            await charger.send(message)
 
     async def handle_authorize(self, charger: ChargerConnection, message_id: str, payload: Dict[str, Any]):
         """인증 처리"""
@@ -313,12 +372,26 @@ class OCPPServer:
 
 async def main():
     """메인 함수"""
-    server = OCPPServer(host="0.0.0.0", port=9000)
+    server = OCPPServer(host="127.0.0.1", port=9000)
+    
     try:
         await server.start()
+    except asyncio.CancelledError:
+        logger.info("서버가 취소됨")
     except KeyboardInterrupt:
-        logger.info("서버 종료 중...")
+        logger.info("서버 종료됨 (키보드 인터럽트)")
+    except Exception as e:
+        logger.error(f"메인 함수 오류: {e}", exc_info=True)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n서버가 종료되었습니다.")
+
+
+
+
+
+

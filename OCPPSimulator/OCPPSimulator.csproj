@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>OCPPSimulator</RootNamespace>
+    <AssemblyName>OCPPSimulator</AssemblyName>
+  </PropertyGroup>
+
+  <!-- 표준 .NET WebSocket 라이브러리만 사용 (추가 NuGet 패키지 불필요) -->
+
+</Project>

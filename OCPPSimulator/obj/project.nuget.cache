@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "wWgzYRkneWw=",
+  "success": true,
+  "projectFilePath": "C:\\Project\\OCPP201(P2M)\\OCPPSimulator\\OCPPSimulator.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\morog\\.nuget\\packages\\microsoft.netcore.app.ref\\6.0.36\\microsoft.netcore.app.ref.6.0.36.nupkg.sha512",
+    "C:\\Users\\morog\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\6.0.36\\microsoft.windowsdesktop.app.ref.6.0.36.nupkg.sha512",
+    "C:\\Users\\morog\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\6.0.36\\microsoft.aspnetcore.app.ref.6.0.36.nupkg.sha512",
+    "C:\\Users\\morog\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\6.0.36\\microsoft.netcore.app.host.win-x64.6.0.36.nupkg.sha512"
+  ],
+  "logs": []
+}
