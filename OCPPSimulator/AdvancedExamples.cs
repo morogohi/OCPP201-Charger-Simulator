@@ -217,8 +217,8 @@ public class AdvancedExamples
                 var stopTasks = chargers.Select(c => c.StopChargingAsync()).ToList();
                 await Task.WhenAll(stopTasks);
 
-                double totalEnergy = chargers.Sum(c => c.EnergyAccumulated);
-                Console.WriteLine($"  누적 에너지: {totalEnergy:F2} kWh");
+                double roundTotalEnergy = chargers.Sum(c => c.EnergyAccumulated);
+                Console.WriteLine($"  누적 에너지: {roundTotalEnergy:F2} kWh");
             }
 
             // 결과 분석
@@ -272,10 +272,10 @@ public class AdvancedExamples
             serverUrl: "ws://invalid.server:9999",
             maxPower: 100
         );
-
         try
         {
-            await Task.WaitAsync(failedCharger.ConnectAsync(), TimeSpan.FromSeconds(5));
+            var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await failedCharger.ConnectAsync();
         }
         catch (OperationCanceledException)
         {

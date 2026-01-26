@@ -1,4 +1,0 @@
-C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Release\net6.0\OCPPSimulator.GeneratedMSBuildEditorConfig.editorconfig
-C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Release\net6.0\OCPPSimulator.AssemblyInfoInputs.cache
-C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Release\net6.0\OCPPSimulator.AssemblyInfo.cs
-C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Release\net6.0\OCPPSimulator.csproj.CoreCompileInputs.cache

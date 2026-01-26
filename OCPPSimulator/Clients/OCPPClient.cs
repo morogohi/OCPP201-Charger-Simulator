@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Net.WebSockets;
-using System.Net.WebSockets.Client;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -16,7 +15,7 @@ namespace OCPPSimulator.Clients;
 /// </summary>
 public class OCPPClient : IDisposable
 {
-    private ClientWebSocket? _websocket;
+    private WebSocket? _websocket;
     private readonly string _chargerId;
     private readonly string _serverUrl;
     private readonly double _maxPower;
@@ -29,7 +28,7 @@ public class OCPPClient : IDisposable
     public double CurrentPower { get; set; } = 0.0;
     public string? TransactionId { get; set; } = null;
     public bool IsConnected { get; private set; } = false;
-    public bool IsCharging { get; private set; } = false;
+    public bool IsCharging { get; set; } = false;
 
     // JSON 직렬화 옵션
     private readonly JsonSerializerOptions _jsonOptions = new()
@@ -56,13 +55,50 @@ public class OCPPClient : IDisposable
             string chargerUrl = $"{_serverUrl}/{_chargerId}";
             Console.WriteLine($"[{_chargerId}] 서버에 연결 중... ({chargerUrl})");
 
-            _websocket = new ClientWebSocket();
-            _websocket.Options.AddSubprotocol("ocpp2.0.1");
+            // ClientWebSocket을 동적으로 생성 (System.Net.WebSockets.Client NuGet 패키지가 설치된 경우)
+            var clientWSType = Type.GetType("System.Net.WebSockets.Client.ClientWebSocket, System.Net.WebSockets.Client");
+            if (clientWSType == null)
+            {
+                throw new InvalidOperationException("ClientWebSocket을 찾을 수 없습니다. System.Net.WebSockets.Client 패키지가 필요합니다.");
+            }
+
+            // 인스턴스 생성
+            _websocket = (WebSocket?)Activator.CreateInstance(clientWSType);
+            if (_websocket == null)
+            {
+                throw new InvalidOperationException("ClientWebSocket 인스턴스를 생성할 수 없습니다.");
+            }
+
+            // Options 속성에서 AddSubprotocol 메서드 호출
+            var optionsProperty = clientWSType.GetProperty("Options");
+            if (optionsProperty != null)
+            {
+                var options = optionsProperty.GetValue(_websocket);
+                if (options != null)
+                {
+                    var method = options.GetType().GetMethod("AddSubprotocol");
+                    method?.Invoke(options, new object[] { "ocpp2.0.1" });
+                }
+            }
 
             var uri = new Uri(chargerUrl);
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            await _websocket.ConnectAsync(uri, cts.Token);
+            // ConnectAsync를 동적으로 호출
+            var connectMethod = clientWSType.GetMethod("ConnectAsync", 
+                new[] { typeof(Uri), typeof(CancellationToken) });
+            if (connectMethod == null)
+            {
+                throw new InvalidOperationException("ConnectAsync 메서드를 찾을 수 없습니다.");
+            }
+
+            var connectTask = (Task?)connectMethod.Invoke(_websocket, new object[] { uri, cts.Token });
+            if (connectTask == null)
+            {
+                throw new InvalidOperationException("ConnectAsync 호출에 실패했습니다.");
+            }
+
+            await connectTask;
 
             IsConnected = true;
             Console.WriteLine($"[{_chargerId}] WebSocket 연결 성공");
