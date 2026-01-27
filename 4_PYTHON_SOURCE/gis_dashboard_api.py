@@ -98,7 +98,7 @@ class StationResponse(BaseModel):
     operator_email: Optional[str]
     total_chargers: int
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     
     model_config = {"from_attributes": True}
 
@@ -143,10 +143,10 @@ class ChargerResponse(BaseModel):
     location_detail: Optional[str]
     current_status: ChargerStatusEnum
     current_power_limit: Optional[float]
-    unit_price_kwh: Decimal
-    base_fee: Decimal
+    unit_price_kwh: Optional[Decimal] = None
+    base_fee: Optional[Decimal] = None
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
     
     model_config = {"from_attributes": True}
 
@@ -162,7 +162,7 @@ class GeoChargerResponse(BaseModel):
     charger_type: ChargerTypeEnum
     current_status: ChargerStatusEnum
     rated_power: float
-    unit_price_kwh: Decimal
+    unit_price_kwh: Optional[Decimal] = None
     
     model_config = {"from_attributes": True}
 
@@ -238,6 +238,71 @@ def get_db():
 async def on_startup():
     """서비스 시작 시 DB 준비"""
     initialize_db()
+
+
+# ==================== HTML 대시보드 ====================
+
+@app.get("/")
+async def root():
+    """GIS 대시보드 메인 페이지"""
+    html_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "9_HTML_DASHBOARD",
+        "gis_dashboard.html"
+    )
+    if os.path.exists(html_path):
+        return FileResponse(html_path, media_type="text/html; charset=utf-8")
+    else:
+        return {
+            "error": "HTML 파일을 찾을 수 없습니다",
+            "path": html_path,
+            "available_paths": [
+                "/docs - Swagger API 문서",
+                "/redoc - ReDoc API 문서"
+            ]
+        }
+
+
+@app.get("/advanced")
+async def advanced_dashboard():
+    """고급 대시보드 페이지"""
+    html_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "9_HTML_DASHBOARD",
+        "advanced_dashboard.html"
+    )
+    if os.path.exists(html_path):
+        return FileResponse(html_path, media_type="text/html; charset=utf-8")
+    else:
+        return {"error": "advanced_dashboard.html을 찾을 수 없습니다"}
+
+
+@app.get("/operations")
+async def operations_dashboard():
+    """운영 관제 대시보드 페이지"""
+    html_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "9_HTML_DASHBOARD",
+        "operations_dashboard.html"
+    )
+    if os.path.exists(html_path):
+        return FileResponse(html_path, media_type="text/html; charset=utf-8")
+    else:
+        return {"error": "operations_dashboard.html을 찾을 수 없습니다"}
+
+
+@app.get("/platform")
+async def management_platform():
+    """충전기 관리 플랫폼 대시보드 페이지"""
+    html_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "9_HTML_DASHBOARD",
+        "management_platform.html"
+    )
+    if os.path.exists(html_path):
+        return FileResponse(html_path, media_type="text/html; charset=utf-8")
+    else:
+        return {"error": "management_platform.html을 찾을 수 없습니다"}
 
 
 # ==================== 헬스체크 ====================
@@ -549,7 +614,7 @@ if __name__ == "__main__":
     # 서버 실행
     uvicorn.run(
         app,
-        host="127.0.0.1",
-        port=5000,
+        host="0.0.0.0",
+        port=8000,
         log_level="info"
     )
