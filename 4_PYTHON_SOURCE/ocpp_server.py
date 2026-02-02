@@ -392,16 +392,21 @@ class OCPPServer:
 
 async def main():
     """메인 함수"""
+    import traceback
     server = OCPPServer(host="127.0.0.1", port=9000)
-    
-    try:
-        await server.start()
-    except asyncio.CancelledError:
-        logger.info("서버가 취소됨")
-    except KeyboardInterrupt:
-        logger.info("서버 종료됨 (키보드 인터럽트)")
-    except Exception as e:
-        logger.error(f"메인 함수 오류: {e}", exc_info=True)
+    while True:
+        try:
+            await server.start()
+        except asyncio.CancelledError:
+            logger.info("서버가 취소됨")
+            break
+        except KeyboardInterrupt:
+            logger.info("서버 종료됨 (키보드 인터럽트)")
+            break
+        except Exception as e:
+            logger.error(f"메인 함수 오류: {e}")
+            traceback.print_exc()
+            logger.info("서버가 예외 후 재시작됩니다.")
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("OCPPSimulator")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b9c5cd37516ea06d3fddc4c087b5d560a5f41978")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+83ed963ea4dd3ca43e1ccdc2ef81aacf48a108e5")]
 [assembly: System.Reflection.AssemblyProductAttribute("OCPPSimulator")]
 [assembly: System.Reflection.AssemblyTitleAttribute("OCPPSimulator")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

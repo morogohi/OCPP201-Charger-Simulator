@@ -1,0 +1,14 @@
+C:\Project\OCPP201(P2M)\OCPPSimulator\bin\Debug\net8.0\OCPPSimulator.exe
+C:\Project\OCPP201(P2M)\OCPPSimulator\bin\Debug\net8.0\OCPPSimulator.deps.json
+C:\Project\OCPP201(P2M)\OCPPSimulator\bin\Debug\net8.0\OCPPSimulator.runtimeconfig.json
+C:\Project\OCPP201(P2M)\OCPPSimulator\bin\Debug\net8.0\OCPPSimulator.dll
+C:\Project\OCPP201(P2M)\OCPPSimulator\bin\Debug\net8.0\OCPPSimulator.pdb
+C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Debug\net8.0\OCPPSimulator.GeneratedMSBuildEditorConfig.editorconfig
+C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Debug\net8.0\OCPPSimulator.AssemblyInfoInputs.cache
+C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Debug\net8.0\OCPPSimulator.AssemblyInfo.cs
+C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Debug\net8.0\OCPPSimulator.csproj.CoreCompileInputs.cache
+C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Debug\net8.0\OCPPSimulator.dll
+C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Debug\net8.0\refint\OCPPSimulator.dll
+C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Debug\net8.0\OCPPSimulator.pdb
+C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Debug\net8.0\OCPPSimulator.genruntimeconfig.cache
+C:\Project\OCPP201(P2M)\OCPPSimulator\obj\Debug\net8.0\ref\OCPPSimulator.dll
