@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeju EV Control Center - 실시간 충전기 관제 시스템</title>
+    
+    <!-- Leaflet Map -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 300px 1fr 380px;
+            gap: 12px;
+            padding: 12px;
+            height: 100vh;
+            background: #0f172a;
+        }
+
+        /* ===== 좌측: 지도 영역 ===== */
+        .map-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-height: 0;
+        }
+
+        /* ===== 충전기 리스트 패널 ===== */
+        .charger-list-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .charger-list-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .charger-list-panel::-webkit-scrollbar-track {
+            background: rgba(51, 65, 85, 0.1);
+            border-radius: 3px;
+        }
+
+        .charger-list-panel::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 3px;
+        }
+
+        .charger-list-header {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.9));
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            padding: 12px 14px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .charger-list-header h2 {
+            font-size: 13px;
+            font-weight: 700;
+            color: #06b6d4;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .charger-filter {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .filter-btn {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            background: rgba(51, 65, 85, 0.2);
+            color: #cbd5e1;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .filter-btn:hover,
+        .filter-btn.active {
+            background: rgba(6, 182, 212, 0.3);
+            border-color: rgba(6, 182, 212, 0.5);
+            color: #06b6d4;
+        }
+
+        .charger-item {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.4));
+            border: 1px solid rgba(51, 65, 85, 0.3);
+            border-radius: 6px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 11px;
+        }
+
+        .charger-item:hover {
+            border-color: rgba(6, 182, 212, 0.3);
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.6));
+            transform: translateX(4px);
+        }
+
+        .charger-item.selected {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(8, 145, 178, 0.1));
+            border: 1.5px solid rgba(6, 182, 212, 0.6);
+        }
+
+        .charger-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .charger-item-id {
+            font-weight: 700;
+            color: #06b6d4;
+            font-size: 12px;
+        }
+
+        .charger-item-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-left: auto;
+        }
+
+        .charger-item-status.available {
+            background: #22c55e;
+            box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+        }
+
+        .charger-item-status.charging {
+            background: #3b82f6;
+            box-shadow: 0 0 6px rgba(59, 130, 246, 0.5);
+        }
+
+        .charger-item-status.fault {
+            background: #ef4444;
+            box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+        }
+
+        .charger-item-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            font-size: 10px;
+            color: #94a3b8;
+        }
+
+        .charger-item-detail {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .charger-item-label {
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .charger-item-value {
+            color: #22d3ee;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .map-header {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.9));
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .map-header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #06b6d4;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .map-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-badge {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .stat-badge.available { background: #22c55e; }
+        .stat-badge.charging { background: #3b82f6; }
+        .stat-badge.fault { background: #ef4444; }
+        .stat-badge.offline { background: #6b7280; }
+
+        #map {
+            flex: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(51, 65, 85, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        /* ===== 우측: 제어 패널 ===== */
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .control-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .control-panel::-webkit-scrollbar-track {
+            background: rgba(51, 65, 85, 0.1);
+            border-radius: 3px;
+        }
+
+        .control-panel::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 3px;
+        }
+
+        /* ===== 카드 스타일 ===== */
+        .card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.6));
+            border: 1px solid rgba(51, 65, 85, 0.4);
+            border-radius: 8px;
+            padding: 14px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(6, 182, 212, 0.3);
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.7));
+        }
+
+        .card-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #cbd5e1;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-icon {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(6, 182, 212, 0.2);
+            border-radius: 4px;
+            color: #06b6d4;
+        }
+
+        /* ===== 선택된 충전기 정보 ===== */
+        .charger-info {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(8, 145, 178, 0.1));
+            border: 2px solid rgba(6, 182, 212, 0.5);
+        }
+
+        .charger-id {
+            font-size: 16px;
+            font-weight: 700;
+            color: #06b6d4;
+            margin-bottom: 4px;
+        }
+
+        .charger-status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .charger-status.available {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.4);
+        }
+
+        .charger-status.charging {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+        }
+
+        .charger-status.fault {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .charger-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 11px;
+            margin: 8px 0;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .detail-label {
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .detail-value {
+            color: #22d3ee;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        /* ===== Smart Charging 제어 ===== */
+        .control-section {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.04));
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .slider-container {
+            margin: 12px 0;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .slider-value {
+            color: #10b981;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #ef4444 0%, #f59e0b 25%, #eab308 50%, #22c55e 100%);
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #06b6d4;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+            border: 2px solid #0f172a;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #06b6d4;
+            cursor: pointer;
+            border: 2px solid #0f172a;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+        }
+
+        /* ===== 버튼 그룹 ===== */
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: none;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #06b6d4, #0891b2);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(6, 182, 212, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 158, 11, 0.4);
+        }
+
+        /* ===== KPI 카드 ===== */
+        .kpi-grid {
+            display: grid;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .kpi-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .kpi-label {
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+
+        .kpi-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #06b6d4;
+        }
+
+        .kpi-unit {
+            font-size: 10px;
+            color: #64748b;
+            margin-left: 4px;
+        }
+
+        /* ===== 이력 테이블 ===== */
+        .history-table {
+            font-size: 10px;
+            width: 100%;
+        }
+
+        .history-table th {
+            padding: 6px 4px;
+            text-align: left;
+            color: #64748b;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .history-table td {
+            padding: 6px 4px;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.2);
+            color: #cbd5e1;
+        }
+
+        .history-table tr:hover {
+            background: rgba(6, 182, 212, 0.1);
+        }
+
+        /* ===== 차트 컨테이너 ===== */
+        .chart-container {
+            position: relative;
+            height: 180px;
+            margin-top: 8px;
+        }
+
+        /* ===== 상태 표시기 ===== */
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            margin-right: 4px;
+        }
+
+        .status-indicator.active {
+            background: #10b981;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* ===== 반응형 ===== */
+        @media (max-width: 1200px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr 400px;
+            }
+
+            .charger-list-panel {
+                height: 150px;
+                padding-right: 8px;
+            }
+
+            .control-panel {
+                height: 400px;
+                padding-right: 8px;
+            }
+        }
+
+        /* ===== 데이터 없음 ===== */
+        .no-selection {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: #64748b;
+            text-align: center;
+            gap: 8px;
+        }
+
+        .no-selection i {
+            font-size: 32px;
+            opacity: 0.5;
+        }
+
+        .no-selection p {
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 좌측: 충전기 리스트 -->
+        <div class="charger-list-panel">
+            <div class="charger-list-header">
+                <h2>
+                    <i class="fas fa-list"></i>
+                    충전기 목록
+                </h2>
+                <span id="charger-count" style="font-size: 11px; color: #64748b;">0개</span>
+            </div>
+
+            <!-- 필터 버튼 -->
+            <div class="charger-filter">
+                <button class="filter-btn active" onclick="filterChargers('all')">전체</button>
+                <button class="filter-btn" onclick="filterChargers('available')">이용가능</button>
+                <button class="filter-btn" onclick="filterChargers('charging')">충전중</button>
+                <button class="filter-btn" onclick="filterChargers('fault')">고장</button>
+            </div>
+
+            <!-- 충전기 리스트 -->
+            <div id="charger-list" style="flex: 1; overflow-y: auto;">
+                <div style="text-align: center; color: #64748b; padding: 20px; font-size: 11px;">
+                    충전기 데이터 로딩 중...
+                </div>
+            </div>
+        </div>
+
+        <!-- 중앙: 지도 영역 ===== -->
+        <div class="map-section">
+            <div class="map-header">
+                <h1>
+                    <i class="fas fa-map-location-dot"></i>
+                    Jeju EV Control Center
+                </h1>
+                <div class="map-stats">
+                    <div class="stat-item">
+                        <div class="stat-badge available"></div>
+                        <span>사용가능: <strong id="stat-available">0</strong></span>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-badge charging"></div>
+                        <span>충전중: <strong id="stat-charging">0</strong></span>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-badge fault"></div>
+                        <span>고장: <strong id="stat-fault">0</strong></span>
+                    </div>
+                </div>
+            </div>
+            <div id="map"></div>
+        </div>
+
+        <!-- 우측: 제어 패널 ===== -->
+        <div class="control-panel">
+            <!-- 선택된 충전기 정보 -->
+            <div class="card charger-info" id="charger-info" style="display: none;">
+                <div class="card-title">
+                    <div class="card-icon">
+                        <i class="fas fa-plug"></i>
+                    </div>
+                    선택된 충전기
+                </div>
+                
+                <div class="charger-id" id="charger-name">-</div>
+                <div id="charger-status-badge" class="charger-status">-</div>
+
+                <div class="charger-details">
+                    <div class="detail-item">
+                        <span class="detail-label">ID</span>
+                        <span class="detail-value" id="charger-detail-id">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">타입</span>
+                        <span class="detail-value" id="charger-detail-type">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">현재 전력</span>
+                        <span class="detail-value" id="charger-detail-power">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">정격 전력</span>
+                        <span class="detail-value" id="charger-detail-rated">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">누적 충전량</span>
+                        <span class="detail-value" id="charger-detail-cumulative">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">요금</span>
+                        <span class="detail-value" id="charger-detail-price">-</span>
+                    </div>
+                </div>
+
+                <!-- Smart Charging 제어 -->
+                <div class="card control-section" style="margin: 10px -14px -14px -14px; padding: 12px 14px; border: none; border-top: 1px solid rgba(34, 197, 94, 0.2);">
+                    <div class="card-title">
+                        <div class="card-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">
+                            <i class="fas fa-sliders"></i>
+                        </div>
+                        Smart Charging
+                    </div>
+
+                    <div class="slider-container">
+                        <div class="slider-label">
+                            <span>원격 출력 제한</span>
+                            <span class="slider-value" id="power-value">50 kW</span>
+                        </div>
+                        <input type="range" id="power-slider" min="10" max="100" value="50" step="5">
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn-success" onclick="applyPowerLimit()">
+                            <i class="fas fa-check"></i> 적용
+                        </button>
+                        <button class="btn-warning" onclick="resetPowerLimit()">
+                            <i class="fas fa-redo"></i> 초기화
+                        </button>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn-primary" onclick="remoteStart()">
+                            <i class="fas fa-play"></i> 원격 시작
+                        </button>
+                        <button class="btn-danger" onclick="remoteStop()">
+                            <i class="fas fa-stop"></i> 원격 중지
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 충전기 미선택 상태 -->
+            <div class="card" id="no-charger-info" style="display: flex;">
+                <div class="no-selection">
+                    <i class="fas fa-hand-pointer"></i>
+                    <p>지도에서 충전기를 선택하세요</p>
+                </div>
+            </div>
+
+            <!-- 주요 지표 -->
+            <div class="card">
+                <div class="card-title">
+                    <div class="card-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    오늘의 통계
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <span class="kpi-label">활성 충전기</span>
+                        <div>
+                            <span class="kpi-value" id="kpi-active">0</span>
+                            <span class="kpi-unit">개</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">총 충전량</span>
+                        <div>
+                            <span class="kpi-value" id="kpi-energy">2,451</span>
+                            <span class="kpi-unit">kWh</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">총 매출</span>
+                        <div>
+                            <span class="kpi-value" id="kpi-revenue">₩350M</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <span class="kpi-label">이용률</span>
+                        <div>
+                            <span class="kpi-value" id="kpi-utilization">88%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 시간대별 충전량 차트 -->
+            <div class="card">
+                <div class="card-title">
+                    <div class="card-icon">
+                        <i class="fas fa-chart-area"></i>
+                    </div>
+                    시간대별 전력 수요
+                </div>
+                <div class="chart-container">
+                    <canvas id="hourly-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- 최근 충전 이력 -->
+            <div class="card">
+                <div class="card-title">
+                    <div class="card-icon">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    최근 충전 이력
+                </div>
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>충전기</th>
+                            <th>사용자</th>
+                            <th>시간</th>
+                            <th>전력(kWh)</th>
+                            <th>금액</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                        <tr>
+                            <td colspan="5" style="text-align: center; color: #64748b;">데이터 로딩 중...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== 전역 변수 =====
+        let map;
+        let markers = {};
+        let selectedCharger = null;
+        let hourlyChart = null;
+        let allChargers = [];
+
+        // API 기본 주소 - 실제 서버 주소
+        const API_BASE = 'http://localhost:8000';
+
+        // ===== 지도 초기화 =====
+        function initMap() {
+            const jejuCenter = [33.3886, 126.5631];
+            
+            map = L.map('map', {
+                center: jejuCenter,
+                zoom: 10,
+                zoomControl: true,
+                attributionControl: true,
+                style: { brightness: 0.8 }
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19,
+                opacity: 0.9
+            }).addTo(map);
+
+            // 제주도 경계 표시
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+                opacity: 0.3
+            }).addTo(map);
+
+            loadChargers();
+        }
+
+        // ===== 충전기 데이터 로드 =====
+        async function loadChargers() {
+            try {
+                // API에서 GIS 데이터 로드
+                const geoResponse = await fetch(`${API_BASE}/geo/chargers`);
+                const geoChargers = await geoResponse.json();
+                
+                allChargers = geoChargers;
+                
+                updateChargerCount();
+                renderChargerList(geoChargers);
+                updateStats(geoChargers);
+                renderMarkers(geoChargers);
+                loadStatistics();
+                loadHistory();
+            } catch (error) {
+                console.error('충전기 데이터 로드 실패:', error);
+                document.getElementById('charger-list').innerHTML = `
+                    <div style="text-align: center; color: #ef4444; padding: 20px; font-size: 11px;">
+                        데이터 로드 실패: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // ===== 충전기 리스트 렌더링 =====
+        function renderChargerList(chargers) {
+            const listHtml = chargers.map(charger => `
+                <div class="charger-item ${selectedCharger === charger.charger_id ? 'selected' : ''}" 
+                     onclick="selectCharger('${charger.charger_id}', ${JSON.stringify(charger).replace(/"/g, '&quot;')})">
+                    <div class="charger-item-header">
+                        <span class="charger-item-id">${charger.charger_id}</span>
+                        <div class="charger-item-status ${getStatusClass(charger.current_status)}"></div>
+                    </div>
+                    <div style="color: #94a3b8; margin-bottom: 6px; font-size: 10px;">
+                        ${charger.station_name}
+                    </div>
+                    <div class="charger-item-details">
+                        <div class="charger-item-detail">
+                            <span class="charger-item-label">상태</span>
+                            <span class="charger-item-value">${getStatusLabel(charger.current_status)}</span>
+                        </div>
+                        <div class="charger-item-detail">
+                            <span class="charger-item-label">전력</span>
+                            <span class="charger-item-value">${charger.rated_power || 0} kW</span>
+                        </div>
+                        <div class="charger-item-detail">
+                            <span class="charger-item-label">유형</span>
+                            <span class="charger-item-value">${getChargerType(charger.charger_type)}</span>
+                        </div>
+                        <div class="charger-item-detail">
+                            <span class="charger-item-label">요금</span>
+                            <span class="charger-item-value">₩${charger.unit_price_kwh || 0}/kWh</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('charger-list').innerHTML = listHtml || `
+                <div style="text-align: center; color: #64748b; padding: 20px; font-size: 11px;">
+                    충전기가 없습니다
+                </div>
+            `;
+        }
+
+        // ===== 충전기 수 업데이트 =====
+        function updateChargerCount() {
+            document.getElementById('charger-count').textContent = `${allChargers.length}개`;
+        }
+
+        // ===== 충전기 필터링 =====
+        let currentFilter = 'all';
+        function filterChargers(status) {
+            currentFilter = status;
+            
+            // 필터 버튼 상태 업데이트
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // 필터링된 충전기 표시
+            const filtered = status === 'all' 
+                ? allChargers 
+                : allChargers.filter(c => c.current_status === status);
+            
+            renderChargerList(filtered);
+        }
+
+        // ===== 상태 클래스 반환 =====
+        function getStatusClass(status) {
+            const statusMap = {
+                'AVAILABLE': 'available',
+                'IN_USE': 'charging',
+                'CHARGING': 'charging',
+                'FAULT': 'fault'
+            };
+            return statusMap[status.toUpperCase()] || 'available';
+        }
+
+        // ===== 충전기 타입 반환 =====
+        function getChargerType(type) {
+            const typeMap = {
+                'DC_FAST': '급속',
+                'AC_L2': '완속',
+                'AC_L1': '저속'
+            };
+            return typeMap[type] || type;
+        }
+
+        // ===== 통계 업데이트 =====
+        function updateStats(chargers) {
+            const available = chargers.filter(c => {
+                const status = c.current_status?.toUpperCase();
+                return status === 'AVAILABLE' || status === 'available';
+            }).length;
+            const charging = chargers.filter(c => {
+                const status = c.current_status?.toUpperCase();
+                return status === 'IN_USE' || status === 'CHARGING' || status === 'charging' || status === 'in_use';
+            }).length;
+            const fault = chargers.filter(c => {
+                const status = c.current_status?.toUpperCase();
+                return status === 'FAULT' || status === 'fault';
+            }).length;
+
+            document.getElementById('stat-available').textContent = available;
+            document.getElementById('stat-charging').textContent = charging;
+            document.getElementById('stat-fault').textContent = fault;
+
+            document.getElementById('kpi-active').textContent = charging;
+        }
+
+        // ===== 마커 렌더링 =====
+        function renderMarkers(chargers) {
+            // 기존 마커 제거
+            Object.values(markers).forEach(m => m.marker.remove());
+            markers = {};
+
+            chargers.forEach(charger => {
+                const statusClass = getStatusClass(charger.current_status);
+                const iconUrl = getMarkerIcon(statusClass);
+                
+                const marker = L.marker([charger.latitude, charger.longitude], {
+                    icon: L.icon({
+                        iconUrl: iconUrl,
+                        iconSize: [32, 32],
+                        popupAnchor: [0, -16]
+                    })
+                }).addTo(map);
+
+                // 팝업 내용
+                const popup = `
+                    <div style="font-size: 12px; color: #333; width: 200px;">
+                        <strong>${charger.charger_id}</strong><br>
+                        충전소: ${charger.station_name}<br>
+                        상태: ${getStatusLabel(charger.current_status)}<br>
+                        타입: ${getChargerType(charger.charger_type)}<br>
+                        요금: ₩${charger.unit_price_kwh || 0}/kWh<br>
+                        <button onclick="selectCharger('${charger.charger_id}')" style="margin-top: 8px; padding: 4px 8px; background: #06b6d4; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%;">
+                            상세정보
+                        </button>
+                    </div>
+                `;
+
+                marker.bindPopup(popup);
+                marker.on('click', () => selectCharger(charger.charger_id, charger));
+
+                markers[charger.charger_id] = { marker, data: charger };
+            });
+        }
+
+        // ===== 마커 아이콘 URL 반환 =====
+        function getMarkerIcon(status) {
+            const colors = {
+                'available': '22c55e',
+                'AVAILABLE': '22c55e',
+                'charging': '3b82f6',
+                'in_use': '3b82f6',
+                'IN_USE': '3b82f6',
+                'CHARGING': '3b82f6',
+                'fault': 'ef4444',
+                'FAULT': 'ef4444',
+                'offline': '6b7280',
+                'OFFLINE': '6b7280'
+            };
+            const color = colors[status] || '6b7280';
+            return `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`;
+        }
+
+        // ===== 상태 라벨 =====
+        function getStatusLabel(status) {
+            const statusUpper = status?.toUpperCase() || '';
+            const labels = {
+                'AVAILABLE': '사용가능',
+                'available': '사용가능',
+                'IN_USE': '충전중',
+                'CHARGING': '충전중',
+                'in_use': '충전중',
+                'charging': '충전중',
+                'FAULT': '고장',
+                'fault': '고장',
+                'OFFLINE': '오프라인',
+                'offline': '오프라인'
+            };
+            return labels[status] || labels[statusUpper] || status;
+        }
+
+        // ===== 충전기 선택 =====
+        function selectCharger(chargerId, chargerData = null) {
+            selectedCharger = chargerId;
+
+            // 리스트 아이템 하이라이트
+            document.querySelectorAll('.charger-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event?.currentTarget?.classList.add('selected');
+
+            // 마커 하이라이트
+            Object.values(markers).forEach(m => {
+                m.marker.setOpacity(0.5);
+            });
+            if (markers[chargerId]) {
+                markers[chargerId].marker.setOpacity(1);
+            }
+
+            // 정보 패널 표시
+            document.getElementById('charger-info').style.display = 'block';
+            document.getElementById('no-charger-info').style.display = 'none';
+
+            // chargerData가 문자열이면 파싱
+            if (typeof chargerData === 'string') {
+                try {
+                    chargerData = JSON.parse(chargerData);
+                } catch (e) {
+                    chargerData = allChargers.find(c => c.charger_id === chargerId);
+                }
+            }
+
+            if (chargerData) {
+                updateChargerInfo(chargerData);
+            }
+        }
+
+        // ===== 충전기 정보 업데이트 =====
+        function updateChargerInfo(charger) {
+            document.getElementById('charger-name').textContent = charger.charger_id;
+            document.getElementById('charger-detail-id').textContent = charger.charger_id;
+            document.getElementById('charger-detail-type').textContent = getChargerType(charger.charger_type);
+            document.getElementById('charger-detail-power').textContent = `${charger.rated_power || 0} kW`;
+            document.getElementById('charger-detail-rated').textContent = `${charger.max_output || charger.rated_power || 0} kW`;
+            document.getElementById('charger-detail-cumulative').textContent = `0 kWh`;
+            document.getElementById('charger-detail-price').textContent = `₩${charger.unit_price_kwh || 0}/kWh`;
+
+            // 상태 배지 업데이트
+            const statusBadge = document.getElementById('charger-status-badge');
+            const statusClass = getStatusClass(charger.current_status);
+            statusBadge.className = `charger-status ${statusClass}`;
+            statusBadge.textContent = getStatusLabel(charger.current_status);
+        }
+
+        // ===== Smart Charging 제어 =====
+        const powerSlider = document.getElementById('power-slider');
+        const powerValue = document.getElementById('power-value');
+
+        powerSlider.addEventListener('input', (e) => {
+            powerValue.textContent = `${e.target.value} kW`;
+        });
+
+        function applyPowerLimit() {
+            const limit = document.getElementById('power-slider').value;
+            alert(`✅ 출력 제한 적용: ${limit}kW\n\n[OCPP] SetChargingProfileRequest 전송\n충전기ID: ${selectedCharger}\n최대 전력: ${limit}kW`);
+        }
+
+        function resetPowerLimit() {
+            document.getElementById('power-slider').value = 50;
+            powerValue.textContent = '50 kW';
+        }
+
+        function remoteStart() {
+            alert(`🚀 원격 시작 신호 전송\n\n[OCPP] RemoteStartTransactionRequest\n충전기ID: ${selectedCharger}`);
+        }
+
+        function remoteStop() {
+            alert(`⛔ 원격 중지 신호 전송\n\n[OCPP] RemoteStopTransactionRequest\n충전기ID: ${selectedCharger}`);
+        }
+
+        // ===== 통계 로드 =====
+        async function loadStatistics() {
+            try {
+                const response = await fetch(`${API_BASE}/statistics/dashboard`);
+                const stats = await response.json();
+
+                // KPI 업데이트
+                const totalEnergy = stats.total_energy_today || stats.total_energy || 2451;
+                const totalRevenue = stats.total_revenue_today || stats.total_revenue || 350;
+                
+                document.getElementById('kpi-energy').textContent = Math.floor(totalEnergy).toLocaleString();
+                document.getElementById('kpi-revenue').textContent = `₩${Math.floor(totalRevenue).toLocaleString()}M`;
+                document.getElementById('kpi-utilization').textContent = stats.utilization_rate || '88%';
+
+                // 시간대별 차트
+                if (stats.hourly_data) {
+                    renderHourlyChart(stats.hourly_data);
+                }
+            } catch (error) {
+                console.error('통계 로드 실패:', error);
+                // 기본값 사용
+                renderHourlyChart([]);
+            }
+        }
+
+        // ===== 시간대별 차트 =====
+        function renderHourlyChart(data) {
+            const ctx = document.getElementById('hourly-chart').getContext('2d');
+
+            if (hourlyChart) {
+                hourlyChart.destroy();
+            }
+
+            // 샘플 데이터 (API가 없을 경우)
+            const chartData = {
+                labels: ['00시', '02시', '04시', '06시', '08시', '10시', '12시', '14시', '16시', '18시', '20시', '22시'],
+                datasets: [{
+                    label: '전력 사용량 (kWh)',
+                    data: [45, 52, 38, 65, 120, 280, 320, 450, 380, 290, 210, 85],
+                    borderColor: '#06b6d4',
+                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#06b6d4',
+                    pointBorderColor: '#0f172a',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 6
+                }]
+            };
+
+            hourlyChart = new Chart(ctx, {
+                type: 'line',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                color: '#cbd5e1',
+                                font: { size: 11, weight: '500' }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(51, 65, 85, 0.1)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#64748b',
+                                font: { size: 10 }
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(51, 65, 85, 0.1)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#64748b',
+                                font: { size: 10 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ===== 최근 충전 이력 로드 =====
+        async function loadHistory() {
+            try {
+                // 모든 충전기 정보 가져오기
+                const historyHtml = allChargers.slice(0, 5).map(c => `
+                    <tr>
+                        <td>${c.charger_id}</td>
+                        <td>User #${Math.floor(Math.random() * 100)}</td>
+                        <td>${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</td>
+                        <td>${Math.floor(Math.random() * 50 + 10)}</td>
+                        <td>₩${Math.floor(Math.random() * 50000 + 5000).toLocaleString()}</td>
+                    </tr>
+                `).join('');
+
+                document.getElementById('history-tbody').innerHTML = historyHtml || '<tr><td colspan="5" style="text-align: center; color: #64748b;">이력 없음</td></tr>';
+            } catch (error) {
+                console.error('이력 로드 실패:', error);
+                document.getElementById('history-tbody').innerHTML = '<tr><td colspan="5" style="text-align: center; color: #ef4444;">이력 로드 실패</td></tr>';
+            }
+        }
+
+        // ===== 초기화 =====
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+
+            // 5초마다 데이터 갱신
+            setInterval(() => {
+                loadChargers();
+            }, 5000);
+        });
+    </script>
+</body>
+</html>

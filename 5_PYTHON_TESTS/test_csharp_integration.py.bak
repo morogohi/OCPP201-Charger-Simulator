@@ -1,0 +1,505 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+OCPP 2.0.1 C# 시뮬레이터와 Python 서버 간 연동 테스트 클라이언트
+
+이 스크립트는 C# 시뮬레이터가 없을 때 Python 서버 테스트용으로 사용됩니다.
+"""
+
+import asyncio
+import json
+import websockets
+import uuid
+from datetime import datetime
+from enum import Enum
+
+class ChargerStatus(Enum):
+    """충전기 상태"""
+    AVAILABLE = "Available"
+    PREPARING = "Preparing"
+    CHARGING = "Charging"
+    SUSPENDED_EVSE = "SuspendedEVSE"
+    SUSPENDED_EV = "SuspendedEV"
+    FINISHING = "Finishing"
+    RESERVED = "Reserved"
+    UNAVAILABLE = "Unavailable"
+    FAULTED = "Faulted"
+
+class OCPPTestClient:
+    """OCPP 2.0.1 테스트 클라이언트"""
+    
+    def __init__(self, charger_id, server_url="ws://127.0.0.1:9000", max_power=100):
+        self.charger_id = charger_id
+        self.server_url = server_url
+        self.websocket = None
+        self.max_power = max_power
+        self.current_status = ChargerStatus.AVAILABLE
+        self.energy_accumulated = 0.0
+        self.current_power = 0.0
+        self.transaction_id = None
+        self.is_connected = False
+        self.is_charging = False
+        
+    async def connect(self):
+        """서버에 연결"""
+        try:
+            # 충전기 ID를 URL 경로에 포함시킴
+            charger_url = f"{self.server_url}/{self.charger_id}"
+            print(f"[{self.charger_id}] 서버 연결 중... ({charger_url})")
+            # OCPP 2.0.1 subprotocol 지정
+            self.websocket = await websockets.connect(
+                charger_url,
+                subprotocols=["ocpp2.0.1"]
+            )
+            self.is_connected = True
+            print(f" [{self.charger_id}] 서버 연결 성공")
+            
+            # BootNotification 전송
+            await self.send_boot_notification()
+            
+            # 메시지 수신 시작
+            asyncio.create_task(self._receive_messages())
+            
+            # Heartbeat 시작
+            asyncio.create_task(self._send_heartbeat())
+            
+        except Exception as e:
+            print(f" [{self.charger_id}] 연결 오류: {e}")
+            self.is_connected = False
+    
+    async def send_boot_notification(self):
+        """BootNotification 전송"""
+        try:
+            message_id = str(uuid.uuid4())[:12]
+            message = [
+                2,  # CALL
+                message_id,
+                "BootNotification",
+                {
+                    "chargingStation": {
+                        "model": "Simulator",
+                        "vendorName": "Python",
+                        "serialNumber": f"SN-{self.charger_id}-001",
+                        "firmwareVersion": "1.0.0"
+                    },
+                    "reason": "PowerUp"
+                }
+            ]
+            
+            await self.websocket.send(json.dumps(message))
+            print(f" [{self.charger_id}] BootNotification 전송")
+            self.current_status = ChargerStatus.AVAILABLE
+            
+        except Exception as e:
+            print(f" [{self.charger_id}] BootNotification 전송 실패: {e}")
+    
+    async def _receive_messages(self):
+        """메시지 수신 루프"""
+        try:
+            while self.is_connected:
+                message = await self.websocket.recv()
+                print(f" [{self.charger_id}] 메시지 수신: {message[:80]}...")
+                
+                try:
+                    msg_array = json.loads(message)
+                    
+                    if len(msg_array) >= 2:
+                        msg_type = msg_array[0]
+                        msg_id = msg_array[1]
+                        
+                        if msg_type == 3:  # CALLRESULT
+                            print(f" [{self.charger_id}] CALLRESULT 수신: {msg_id}")
+                        
+                        elif msg_type == 2:  # CALL
+                            action = msg_array[2]
+                            payload = msg_array[3] if len(msg_array) > 3 else {}
+                            
+                            await self._handle_call(action, msg_id, payload)
+                            
+                except json.JSONDecodeError:
+                    print(f"⚠️ [{self.charger_id}] JSON 파싱 오류")
+                    
+        except websockets.exceptions.ConnectionClosed:
+            print(f"� [{self.charger_id}] 연결 종료")
+            self.is_connected = False
+        except Exception as e:
+            print(f" [{self.charger_id}] 수신 오류: {e}")
+    
+    async def _handle_call(self, action, msg_id, payload):
+        """CALL 메시지 처리"""
+        print(f"� [{self.charger_id}] CALL 수신: {action}")
+        
+        if action == "RequestStartTransaction":
+            await self._handle_request_start_transaction(msg_id, payload)
+        
+        elif action == "RequestStopTransaction":
+            await self._handle_request_stop_transaction(msg_id, payload)
+        
+        elif action == "SetChargingProfile":
+            await self._handle_set_charging_profile(msg_id, payload)
+        
+        else:
+            # 기본 응답
+            await self._send_call_result(msg_id, {"status": "Accepted"})
+    
+    async def _handle_request_start_transaction(self, msg_id, payload):
+        """RequestStartTransaction 처리"""
+        try:
+            id_token = payload.get("idToken", {}).get("idToken", "unknown")
+            print(f"� [{self.charger_id}] 충전 시작 요청: {id_token}")
+            
+            # 응답
+            await self._send_call_result(msg_id, {"status": "Accepted"})
+            
+            # 충전 시작
+            await self.start_charging(id_token)
+            
+        except Exception as e:
+            print(f" [{self.charger_id}] 요청 처리 오류: {e}")
+            await self._send_call_result(msg_id, {"status": "Rejected"})
+    
+    async def _handle_request_stop_transaction(self, msg_id, payload):
+        """RequestStopTransaction 처리"""
+        try:
+            print(f"⏹️ [{self.charger_id}] 충전 중지 요청")
+            
+            # 응답
+            await self._send_call_result(msg_id, {"status": "Accepted"})
+            
+            # 충전 중지
+            await self.stop_charging()
+            
+        except Exception as e:
+            print(f" [{self.charger_id}] 요청 처리 오류: {e}")
+            await self._send_call_result(msg_id, {"status": "Rejected"})
+    
+    async def _handle_set_charging_profile(self, msg_id, payload):
+        """SetChargingProfile 처리"""
+        try:
+            profile = payload.get("chargingProfile", {})
+            periods = profile.get("chargingSchedule", {}).get("chargingSchedulePeriod", [])
+            
+            if periods:
+                max_power = periods[0].get("limit", self.max_power) / 1000
+                self.max_power = min(max_power, 100)  # 최대 100kW
+                print(f"⚡ [{self.charger_id}] 출력 제한: {self.max_power}kW")
+            
+            await self._send_call_result(msg_id, {"status": "Accepted"})
+            
+        except Exception as e:
+            print(f" [{self.charger_id}] 요청 처리 오류: {e}")
+            await self._send_call_result(msg_id, {"status": "Rejected"})
+    
+    async def _send_call_result(self, msg_id, payload):
+        """CALLRESULT 전송"""
+        try:
+            message = [
+                3,  # CALLRESULT
+                msg_id,
+                payload
+            ]
+            
+            await self.websocket.send(json.dumps(message))
+            print(f" [{self.charger_id}] CALLRESULT 전송: {msg_id}")
+            
+        except Exception as e:
+            print(f" [{self.charger_id}] 응답 전송 실패: {e}")
+    
+    async def _send_heartbeat(self):
+        """Heartbeat 전송 루프 (30초 간격)"""
+        try:
+            while self.is_connected:
+                await asyncio.sleep(30)
+                
+                message_id = str(uuid.uuid4())[:12]
+                message = [
+                    2,  # CALL
+                    message_id,
+                    "Heartbeat",
+                    {
+                        "currentTime": datetime.utcnow().isoformat() + "Z"
+                    }
+                ]
+                
+                await self.websocket.send(json.dumps(message))
+                print(f" [{self.charger_id}] Heartbeat 전송")
+                
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            print(f" [{self.charger_id}] Heartbeat 오류: {e}")
+    
+    async def start_charging(self, id_token="user_token"):
+        """충전 시작"""
+        try:
+            if self.current_status != ChargerStatus.AVAILABLE:
+                print(f"⚠️ [{self.charger_id}] 현재 상태에서는 충전을 시작할 수 없음")
+                return
+            
+            self.current_status = ChargerStatus.PREPARING
+            self.transaction_id = str(uuid.uuid4())[:8]
+            self.energy_accumulated = 0.0
+            self.is_charging = True
+            
+            # TransactionEvent - Started
+            await self._send_transaction_event("Started", id_token)
+            
+            # 준비 → 충전
+            await asyncio.sleep(2)
+            self.current_status = ChargerStatus.CHARGING
+            self.current_power = self.max_power
+            
+            # TransactionEvent - Updated
+            await self._send_transaction_event("Updated", id_token)
+            
+            print(f"� [{self.charger_id}] 충전 시작: {self.transaction_id}")
+            
+            # 충전 시뮬레이션
+            asyncio.create_task(self._simulate_charging())
+            
+        except Exception as e:
+            print(f" [{self.charger_id}] 충전 시작 오류: {e}")
+    
+    async def stop_charging(self):
+        """충전 중지"""
+        try:
+            if not self.is_charging:
+                print(f"⚠️ [{self.charger_id}] 충전 중인 상태가 아님")
+                return
+            
+            self.is_charging = False
+            self.current_status = ChargerStatus.FINISHING
+            
+            # TransactionEvent - Updated
+            await self._send_transaction_event("Updated", "user_token")
+            
+            await asyncio.sleep(1)
+            
+            # TransactionEvent - Ended
+            await self._send_transaction_event("Ended", "user_token")
+            
+            self.current_status = ChargerStatus.AVAILABLE
+            self.current_power = 0.0
+            
+            print(f"⏹️ [{self.charger_id}] 충전 중지: {self.transaction_id} (누적: {self.energy_accumulated:.2f} kWh)")
+            
+            self.transaction_id = None
+            
+        except Exception as e:
+            print(f" [{self.charger_id}] 충전 중지 오류: {e}")
+    
+    async def _simulate_charging(self):
+        """충전 시뮬레이션 (전력 소비)"""
+        try:
+            while self.is_charging:
+                await asyncio.sleep(5)
+                
+                # 에너지 누적 (초당 전력 * 시간)
+                energy_per_second = (self.current_power / 3600)
+                self.energy_accumulated += energy_per_second * 5
+                
+                # 80% 이후 전력 감소 (배터리 곡선)
+                if self.energy_accumulated > 20:
+                    self.current_power = self.max_power * 0.7
+                
+                # 진행 상황 업데이트
+                if self.is_charging:
+                    await self._send_transaction_event("Updated", "user_token")
+                    
+        except Exception as e:
+            print(f" [{self.charger_id}] 충전 시뮬레이션 오류: {e}")
+    
+    async def _send_transaction_event(self, event_type, id_token):
+        """TransactionEvent 전송"""
+        try:
+            message_id = str(uuid.uuid4())[:12]
+            
+            message = [
+                2,  # CALL
+                message_id,
+                "TransactionEvent",
+                {
+                    "eventType": event_type,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "triggerReason": "Authorized",
+                    "seqNo": 0,
+                    "transactionData": {
+                        "transactionId": self.transaction_id,
+                        "chargingState": self.current_status.value,
+                        "timeSpentCharging": 0,
+                        "stoppedReason": "Local" if event_type == "Ended" else None,
+                        "totalCost": round(self.energy_accumulated * 150, 2),
+                        "chargingPeriods": [
+                            {
+                                "startDateTime": datetime.utcnow().isoformat() + "Z",
+                                "dimensions": [
+                                    {
+                                        "name": "Energy.Active.Import.Register",
+                                        "unit": "Wh",
+                                        "unitMultiplier": 1,
+                                        "value": self.energy_accumulated * 1000
+                                    },
+                                    {
+                                        "name": "Power.Active.Import",
+                                        "unit": "W",
+                                        "unitMultiplier": 1000,
+                                        "value": self.current_power
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            ]
+            
+            await self.websocket.send(json.dumps(message))
+            print(f" [{self.charger_id}] TransactionEvent 전송 ({event_type}): {self.energy_accumulated:.2f} kWh")
+            
+        except Exception as e:
+            print(f" [{self.charger_id}] TransactionEvent 전송 실패: {e}")
+    
+    async def send_status_notification(self):
+        """StatusNotification 전송"""
+        try:
+            message_id = str(uuid.uuid4())[:12]
+            
+            message = [
+                2,  # CALL
+                message_id,
+                "StatusNotification",
+                {
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "connectorStatus": self.current_status.value,
+                    "evseId": 1,
+                    "connectorId": 1
+                }
+            ]
+            
+            await self.websocket.send(json.dumps(message))
+            print(f" [{self.charger_id}] StatusNotification 전송: {self.current_status.value}")
+            
+        except Exception as e:
+            print(f" [{self.charger_id}] StatusNotification 전송 실패: {e}")
+    
+    async def disconnect(self):
+        """연결 해제"""
+        try:
+            self.is_connected = False
+            if self.websocket:
+                await self.websocket.close()
+            print(f" [{self.charger_id}] 연결 해제")
+        except Exception as e:
+            print(f" [{self.charger_id}] 연결 해제 오류: {e}")
+    
+    def get_status(self):
+        """현재 상태 반환"""
+        return f"[{self.charger_id}] 상태: {self.current_status.value}, 전력: {self.current_power}kW, 누적: {self.energy_accumulated:.2f}kWh"
+
+
+async def test_scenario_1():
+    """시나리오 1: 기본 연결 및 BootNotification"""
+    print("\n" + "="*80)
+    print("[시나리오 1] 기본 연결 및 BootNotification")
+    print("="*80)
+    
+    charger = OCPPTestClient("emart_jeju_01")
+    await charger.connect()
+    await asyncio.sleep(5)
+    print(charger.get_status())
+    await charger.disconnect()
+
+
+async def test_scenario_2():
+    """시나리오 2: 충전 세션"""
+    print("\n" + "="*80)
+    print("[시나리오 2] 충전 세션 (Start → Charging → Stop)")
+    print("="*80)
+    
+    charger = OCPPTestClient("emart_jeju_01", max_power=100)
+    await charger.connect()
+    await asyncio.sleep(2)
+    
+    # 충전 시작
+    await charger.start_charging("token_user_001")
+    await asyncio.sleep(15)  # 15초 진행
+    
+    # 충전 중지
+    await charger.stop_charging()
+    await asyncio.sleep(2)
+    
+    print(charger.get_status())
+    await charger.disconnect()
+
+
+async def test_scenario_3():
+    """시나리오 3: 다중 충전기"""
+    print("\n" + "="*80)
+    print("[시나리오 3] 다중 충전기 동시 운영")
+    print("="*80)
+    
+    chargers = [
+        OCPPTestClient("emart_jeju_01", max_power=100),
+        OCPPTestClient("emart_jeju_02", max_power=100),
+        OCPPTestClient("emart_shinjeju_01", max_power=50),
+    ]
+    
+    # 연결
+    for charger in chargers:
+        await charger.connect()
+    
+    await asyncio.sleep(3)
+    
+    # 충전 시작
+    print("\n[다중 충전 시작]")
+    for charger in chargers:
+        await charger.start_charging()
+    
+    await asyncio.sleep(20)  # 20초 진행
+    
+    # 충전 중지
+    print("\n[다중 충전 중지]")
+    for charger in chargers:
+        await charger.stop_charging()
+    
+    await asyncio.sleep(2)
+    
+    # 상태 출력
+    for charger in chargers:
+        print(charger.get_status())
+    
+    # 종료
+    for charger in chargers:
+        await charger.disconnect()
+
+
+async def main():
+    """메인 함수"""
+    import sys
+    
+    print("="*80)
+    print("  OCPP 2.0.1 Python 테스트 클라이언트")
+    print("="*80)
+    
+    if len(sys.argv) > 1:
+        scenario = sys.argv[1]
+    else:
+        scenario = "all"
+    
+    try:
+        if scenario == "1" or scenario == "all":
+            await test_scenario_1()
+        
+        if scenario == "2" or scenario == "all":
+            await test_scenario_2()
+        
+        if scenario == "3" or scenario == "all":
+            await test_scenario_3()
+        
+        print("\n 모든 테스트 완료!")
+        
+    except Exception as e:
+        print(f"\n 오류 발생: {e}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
